@@ -1,0 +1,7 @@
+{
+  "name": "Sãan Degree - Smart TV Conciergerie Ouaga 2000",
+  "description": "Système d'affichage d'accueil et conciergerie Smart TV pour les appartements meublés de haut standing Sãan Degree à Ouaga 2000, Ouagadougou. Wifi fibre optique, gardiennage 24h/24 et livret d'accueil d'exception.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

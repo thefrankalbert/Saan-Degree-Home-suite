@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-serif: 'Cormorant Garamond', Georgia, serif;
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #090a0f;
+    color: #e2e8f0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  h1, h2, .font-serif-luxury {
+    font-family: var(--font-serif);
+  }
+}
+
+/* Luxury TV glass & reflections */
+.luxury-glass {
+  background: rgba(15, 17, 26, 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.luxury-glass-active {
+  background: rgba(26, 30, 46, 0.85);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.7), 0 0 24px -4px rgba(212, 175, 55, 0.15);
+}
+
+.champagne-gradient {
+  background: linear-gradient(135deg, #fdfbf7 0%, #e2d9c8 50%, #c5b392 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.silver-gradient {
+  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Subtle TV screen burn-in protection drift */
+@keyframes tvAmbientDrift {
+  0% { transform: scale(1.03) translate(0px, 0px); }
+  50% { transform: scale(1.04) translate(-4px, 3px); }
+  100% { transform: scale(1.03) translate(0px, 0px); }
+}
+
+.animate-tv-drift {
+  animation: tvAmbientDrift 45s ease-in-out infinite;
+}
