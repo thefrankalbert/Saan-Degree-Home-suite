@@ -23,7 +23,8 @@ import {
   Compass,
   Star,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  Lock
 } from 'lucide-react';
 import { Property, GuestStay } from '../types';
 
@@ -38,6 +39,7 @@ interface AdminDashboardProps {
   onOpenSetupGuide: () => void;
   onOpenSheetSync: () => void;
   onOpenTVTester: () => void;
+  onLock?: () => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -50,7 +52,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onOpenMobileView,
   onOpenSetupGuide,
   onOpenSheetSync,
-  onOpenTVTester
+  onOpenTVTester,
+  onLock
 }) => {
   const [activeTab, setActiveTab] = useState<'guest' | 'wifi' | 'guide' | 'places' | 'theme' | 'contacts'>('guest');
   const [saveToast, setSaveToast] = useState(false);
@@ -326,6 +329,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <Smartphone className="w-4 h-4 text-slate-400" strokeWidth={1.5} />
             <span className="hidden md:inline">Vue Smartphone</span>
           </button>
+
+          {onLock && (
+            <button
+              onClick={onLock}
+              className="p-2 text-slate-400 hover:text-white hover:bg-white/[0.06] rounded-xl transition"
+              title="Verrouiller l’accès Conciergerie"
+            >
+              <Lock className="w-4 h-4" strokeWidth={1.5} />
+            </button>
+          )}
 
           <button
             onClick={() => onOpenTVKiosk(selectedProperty.id)}

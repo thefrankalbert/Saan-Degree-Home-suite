@@ -12,6 +12,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { TVSetupGuideModal } from './components/TVSetupGuideModal';
 import { GoogleSheetSyncModal } from './components/GoogleSheetSyncModal';
 import { TVTesterModal } from './components/TVTesterModal';
+import { AdminAuthModal } from './components/AdminAuthModal';
 import { SyncService } from './utils/syncService';
 
 const STORAGE_KEY = 'saan_degree_genesis_v3';
@@ -39,6 +40,14 @@ export default function App() {
   const [isSetupGuideOpen, setIsSetupGuideOpen] = useState(false);
   const [isSheetSyncOpen, setIsSheetSyncOpen] = useState(false);
   const [isTVTesterOpen, setIsTVTesterOpen] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('saan_admin_auth') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Initialize view mode from URL params
   useEffect(() => {
@@ -205,7 +214,34 @@ export default function App() {
         onOpenSetupGuide={() => setIsSetupGuideOpen(true)}
         onOpenSheetSync={() => setIsSheetSyncOpen(true)}
         onOpenTVTester={() => setIsTVTesterOpen(true)}
+        onLock={() => {
+          setIsAdminAuthenticated(false);
+          try {
+            sessionStorage.removeItem('saan_admin_auth');
+          } catch {
+            // Ignored
+          }
+        }}
       />
+
+      {/* Admin Auth Modal if not authenticated */}
+      {!isAdminAuthenticated && (
+        <AdminAuthModal
+          isOpen={!isAdminAuthenticated}
+          onClose={() => {
+            // If user closes modal without logging in, switch to guest view for safety
+            setViewMode('guest');
+          }}
+          onAuthenticated={() => {
+            setIsAdminAuthenticated(true);
+            try {
+              sessionStorage.setItem('saan_admin_auth', 'true');
+            } catch {
+              // Ignored
+            }
+          }}
+        />
+      )}
 
       {isSetupGuideOpen && selectedProperty && (
         <TVSetupGuideModal
