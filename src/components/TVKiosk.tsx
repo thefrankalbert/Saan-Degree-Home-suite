@@ -158,10 +158,34 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
     year: 'numeric'
   });
 
-  const capitalizedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+  // Detect TV mode dynamically
+  const isTV = typeof window !== 'undefined' && (
+    new URLSearchParams(window.location.search).has('tv') ||
+    new URLSearchParams(window.location.search).has('kiosk')
+  );
 
-  // Detect TV mode from URL or params
-  const isTV = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('tv');
+  useEffect(() => {
+    if (isTV) {
+      // Force logical 1920px width on Smart TVs
+      let metaViewport = document.querySelector('meta[name=viewport]');
+      if (!metaViewport) {
+        metaViewport = document.createElement('meta');
+        metaViewport.setAttribute('name', 'viewport');
+        document.head.appendChild(metaViewport);
+      }
+      metaViewport.setAttribute('content', 'width=1920, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      
+      // Proportional UI scaling using rem base (16px -> 32px = 2.0x zoom)
+      // This natively scales all Tailwind margins, text, widths, and heights for a 1080p TV.
+      document.documentElement.style.fontSize = '32px';
+      
+      return () => {
+        document.documentElement.style.fontSize = '';
+      };
+    }
+  }, [isTV]);
+
+  const capitalizedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
 
   // NIGHT / DIMMER MODE
   if (isDimmerMode) {
@@ -170,7 +194,7 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
         onClick={() => setIsDimmerMode(false)}
         className="fixed inset-0 z-50 bg-[#050608] flex flex-col items-center justify-center cursor-pointer select-none"
       >
-        <div className="text-center space-y-4 opacity-50 hover:opacity-100 transition-opacity duration-700" style={{ transform: isTV ? 'scale(1.5)' : 'none' }}>
+        <div className="text-center space-y-4 opacity-50 hover:opacity-100 transition-opacity duration-700">
           <div className="text-7xl md:text-8xl font-light text-slate-400 font-mono tracking-wider tabular-nums">
             {formattedTime}
           </div>
@@ -198,15 +222,7 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
       <div className="absolute inset-0 bg-gradient-to-t from-[#06070a] via-[#07080bd4] to-[#07080bf0] pointer-events-none" />
 
       {/* Main Scaled Wrapper */}
-      <div 
-        className="relative z-10 w-full h-full flex flex-col justify-between origin-center"
-        style={{ 
-          transform: isTV ? 'scale(1.35)' : 'none',
-          maxWidth: isTV ? 'calc(100% / 1.35)' : '100%',
-          maxHeight: isTV ? 'calc(100% / 1.35)' : '100%',
-          padding: '1.25rem 2rem' // py-5 px-8 equivalent
-        }}
-      >
+      <div className="relative z-10 w-full h-full flex flex-col justify-between px-8 py-5 md:px-12 md:py-6 lg:px-16 lg:py-7">
         
         {/* TOP BAR: Palace Hotel Header (NO ADMIN BUTTON) */}
         <header className="shrink-0 flex items-center justify-between pb-3 border-b border-white/[0.08]">
