@@ -61,7 +61,7 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
   const [isDimmerMode, setIsDimmerMode] = useState<boolean>(false);
   const [lastRemoteAction, setLastRemoteAction] = useState<string>('');
   const [lastRawKey, setLastRawKey] = useState<string>('');
-  const [isCarouselActive, setIsCarouselActive] = useState<boolean>(false);
+  const [isCarouselActive, setIsCarouselActive] = useState<boolean>(true);
 
   const tvContainerRef = useRef<HTMLDivElement>(null);
   const lastKeyTimestamp = useRef<number>(0);
@@ -115,12 +115,12 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
     return () => clearTimeout(timer);
   }, [activeTab]);
 
-  // Automatic Carousel mode (every 18s)
+  // Automatic Carousel mode (every 14s by default)
   useEffect(() => {
     if (!isCarouselActive) return;
     const interval = setInterval(() => {
       goToNextTab();
-    }, 18000);
+    }, 14000);
     return () => clearInterval(interval);
   }, [isCarouselActive, goToNextTab]);
 
@@ -387,6 +387,17 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
       
       {/* Dark Luxury Vignette Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-[#06070a] via-[#07080bd4] to-[#07080bf0] pointer-events-none" />
+
+      {/* Golden Auto-Cycle Subtle Ambient Indicator */}
+      {isCarouselActive && (
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-white/[0.04] overflow-hidden z-30 pointer-events-none">
+          <div 
+            key={activeTab}
+            className="h-full bg-[#c5b392]/80 transition-all duration-1000"
+            style={{ width: '100%' }}
+          />
+        </div>
+      )}
 
       {/* Main Scaled Wrapper */}
       <div className="relative z-10 w-full h-full flex flex-col justify-between px-8 py-5 md:px-12 md:py-6 lg:px-16 lg:py-7">
