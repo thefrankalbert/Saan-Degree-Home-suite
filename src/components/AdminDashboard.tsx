@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Tv, 
   Plus, 
@@ -12,21 +12,26 @@ import {
   Phone, 
   KeyRound, 
   Coffee, 
-  HelpCircle,
-  Eye,
-  Sliders,
-  ChevronRight,
-  Save,
-  CheckCircle2,
-  Maximize2,
-  Calendar,
-  Compass,
-  Star,
-  ExternalLink,
-  RefreshCw,
-  Lock
+  HelpCircle, 
+  Eye, 
+  Sliders, 
+  ChevronRight, 
+  Save, 
+  CheckCircle2, 
+  Maximize2, 
+  Calendar, 
+  Compass, 
+  Star, 
+  ExternalLink, 
+  RefreshCw, 
+  Lock,
+  Database,
+  Copy,
+  Check,
+  AlertCircle
 } from 'lucide-react';
 import { Property, GuestStay } from '../types';
+import { SyncService } from '../utils/syncService';
 
 interface AdminDashboardProps {
   properties: Property[];
@@ -58,6 +63,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<'guest' | 'wifi' | 'guide' | 'places' | 'theme' | 'contacts'>('guest');
   const [saveToast, setSaveToast] = useState(false);
   const [isNewPropertyModalOpen, setIsNewPropertyModalOpen] = useState(false);
+
+  // Supabase Sync states
+  const [supabaseStatus, setSupabaseStatus] = useState<{ configured: boolean; tableReady: boolean; message: string }>({
+    configured: true,
+    tableReady: false,
+    message: 'Vérification...'
+  });
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+  const [isCheckingSupabase, setIsCheckingSupabase] = useState(false);
+
+  const checkStatus = useCallback(async () => {
+    setIsCheckingSupabase(true);
+    const res = await SyncService.checkSupabaseStatus();
+    setSupabaseStatus(res);
+    setIsCheckingSupabase(false);
+  }, []);
+
+  useEffect(() => {
+    checkStatus();
+  }, [checkStatus]);
 
   // Form states
   const [guestName, setGuestName] = useState(selectedProperty.currentStay.name);
@@ -331,6 +357,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <span className="hidden md:inline">Vue Smartphone</span>
           </button>
 
+          {/* Supabase Realtime Sync Status Button */}
+          <button
+            onClick={() => setIsSupabaseModalOpen(true)}
+            className={`px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 border transition ${
+              supabaseStatus.tableReady
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+                : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20 animate-pulse'
+            }`}
+            title="État de la synchronisation Supabase avec la TV"
+          >
+            <span className={`w-2 h-2 rounded-full ${supabaseStatus.tableReady ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-amber-400'}`} />
+            <Database className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline font-medium">
+              {supabaseStatus.tableReady ? 'Sync TV Directe (Active)' : 'Sync TV : Action Requise'}
+            </span>
+          </button>
+
           {onLock && (
             <button
               onClick={onLock}
@@ -355,6 +398,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* Main Content Area */}
       <div className="flex-1 max-w-7xl w-full mx-auto p-6 lg:p-10 space-y-8">
+        
+        {/* Supabase Setup Alert Banner if table not yet created */}
+        {!supabaseStatus.tableReady && (
+          <div className="p-4 rounded-2xl bg-amber-500/[0.08] border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div className="space-y-0.5">
+                <div className="text-xs font-semibold text-white flex items-center gap-2">
+                  <span>Synchronisation Smart TV en attente</span>
+                  <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded border border-amber-500/30">Action en 1 min</span>
+                </div>
+                <p className="text-xs text-slate-300 font-light">
+                  Pour que vos modifications sur cet écran apparaissent <strong>automatiquement sur la télé Sharp</strong> en direct, créez la table dans votre console Supabase.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsSupabaseModalOpen(true)}
+              className="px-4 py-2 rounded-xl bg-[#c5b392] hover:bg-[#d8ccb8] text-[#08090d] text-xs font-semibold shrink-0 cursor-pointer shadow-lg shadow-[#c5b392]/15 flex items-center gap-1.5"
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Activer la synchronisation TV (1 clic)</span>
+            </button>
+          </div>
+        )}
         
         {/* Active Property Banner */}
         <div className="relative rounded-3xl overflow-hidden border border-white/[0.08] p-6 lg:p-8 bg-[#0c0e14] flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl">
@@ -956,6 +1026,148 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Supabase Realtime Sync Modal */}
+      {isSupabaseModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0e1017] border border-white/10 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative">
+            
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Database className="w-5 h-5 text-[#c5b392]" />
+                  <h3 className="text-lg font-serif-luxury text-white">Synchronisation Smart TV en Temps Réel</h3>
+                </div>
+                <p className="text-xs text-slate-400 font-light">
+                  Liaison directe entre votre tableau de bord Vercel et l'écran Sharp du salon
+                </p>
+              </div>
+              <button
+                onClick={() => setIsSupabaseModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/[0.06] transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Project Status */}
+            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Projet Supabase :</span>
+                <span className="font-mono text-slate-200">lseyghdywdzonvmpiovc</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Statut de la table :</span>
+                <span className={`font-semibold flex items-center gap-1.5 ${supabaseStatus.tableReady ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  <span className={`w-2 h-2 rounded-full ${supabaseStatus.tableReady ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-amber-400'}`} />
+                  {supabaseStatus.tableReady ? 'Table active & synchronisée' : 'Table requise dans Supabase'}
+                </span>
+              </div>
+            </div>
+
+            {/* Instruction if table not ready */}
+            {!supabaseStatus.tableReady ? (
+              <div className="space-y-4">
+                <div className="space-y-2 text-xs text-slate-300 font-light">
+                  <p className="text-white font-medium">Pour activer la transmission instantanée vers la TV :</p>
+                  <ol className="list-decimal list-inside space-y-1 text-slate-400">
+                    <li>Copiez le script SQL ci-dessous en 1 clic.</li>
+                    <li>Ouvrez l'éditeur SQL de votre projet Supabase.</li>
+                    <li>Collez et cliquez sur <strong className="text-white font-semibold">Run</strong>.</li>
+                  </ol>
+                </div>
+
+                {/* SQL Code Box */}
+                <div className="relative rounded-2xl bg-black/60 border border-white/10 p-4 font-mono text-[11px] text-slate-300 overflow-x-auto">
+                  <button
+                    onClick={() => {
+                      const sql = `CREATE TABLE IF NOT EXISTS public.property (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  slug TEXT,
+  data JSONB NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.property ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read and write" ON public.property FOR ALL USING (true) WITH CHECK (true);
+ALTER PUBLICATION supabase_realtime ADD TABLE public.property;`;
+                      navigator.clipboard.writeText(sql);
+                      setCopiedSql(true);
+                      setTimeout(() => setCopiedSql(false), 2500);
+                    }}
+                    className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs flex items-center gap-1.5 transition font-sans cursor-pointer"
+                  >
+                    {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedSql ? 'Copié !' : 'Copier le SQL'}</span>
+                  </button>
+                  <pre className="pr-24">
+{`CREATE TABLE IF NOT EXISTS public.property (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  slug TEXT,
+  data JSONB NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.property ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read and write" ON public.property FOR ALL USING (true) WITH CHECK (true);
+ALTER PUBLICATION supabase_realtime ADD TABLE public.property;`}
+                  </pre>
+                </div>
+
+                {/* Direct Action Link */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <a
+                    href="https://supabase.com/dashboard/project/lseyghdywdzonvmpiovc/sql/new"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-white text-xs flex items-center gap-2 transition"
+                  >
+                    <span>Ouvrir Supabase SQL Editor</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+
+                  <button
+                    onClick={checkStatus}
+                    disabled={isCheckingSupabase}
+                    className="px-5 py-2.5 bg-[#c5b392] hover:bg-[#d8ccb8] text-[#08090d] text-xs font-semibold rounded-xl flex items-center gap-2 transition shadow-lg shadow-[#c5b392]/20 cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isCheckingSupabase ? 'animate-spin' : ''}`} />
+                    <span>{isCheckingSupabase ? 'Vérification...' : 'Vérifier la connexion'}</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <div>
+                    <p className="font-semibold text-white">Tout est prêt !</p>
+                    <p className="text-slate-300 font-light mt-0.5">
+                      Chaque fois que vous modifiez un séjour et cliquez sur « Enregistrer », la télécommande et l'écran TV reçoivent instantanément la mise à jour sans recharger la page.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => {
+                      SyncService.saveToServer(properties);
+                      setIsSupabaseModalOpen(false);
+                    }}
+                    className="px-5 py-2.5 bg-[#c5b392] hover:bg-[#d8ccb8] text-[#08090d] text-xs font-semibold rounded-xl transition cursor-pointer shadow-lg"
+                  >
+                    Envoyer toutes les données vers la TV maintenant
+                  </button>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       )}

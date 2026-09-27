@@ -8,30 +8,46 @@ export class SyncService {
 
   // Save properties to Supabase DB and local server API
   static async saveToServer(properties: Property[]): Promise<boolean> {
+    let savedToSupabase = false;
     try {
       // 1. Persist to Supabase if configured
       if (isSupabaseConfigured && supabase) {
         for (const prop of properties) {
-          await supabase.from('property').upsert(
-            {
-              id: prop.id,
-              name: prop.name,
-              slug: prop.slug,
-              data: prop,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'id' }
-          );
+          const payload = {
+            id: prop.id,
+            name: prop.name,
+            slug: prop.slug,
+            data: prop,
+            updated_at: new Date().toISOString(),
+          };
+
+          // Try 'property' table first, fallback to 'properties'
+          let { error } = await supabase.from('property').upsert(payload, { onConflict: 'id' });
+          if (error && error.code === 'PGRST205') {
+            const fallback = await supabase.from('properties').upsert(payload, { onConflict: 'id' });
+            error = fallback.error;
+          }
+
+          if (!error) {
+            savedToSupabase = true;
+          } else {
+            console.warn('[SyncService] Supabase save warning:', error.message);
+          }
         }
       }
 
-      // 2. Broadcast via local backend API
-      const res = await fetch('/api/properties', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ properties }),
-      });
-      return res.ok;
+      // 2. Broadcast via local backend API if available
+      try {
+        await fetch('/api/properties', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ properties }),
+        });
+      } catch {
+        // Backend API optional on static hosting like Vercel
+      }
+
+      return savedToSupabase;
     } catch (err) {
       console.error('Failed to save properties:', err);
       return false;
@@ -43,10 +59,19 @@ export class SyncService {
     try {
       // 1. Try Supabase first
       if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('property')
           .select('data')
           .order('updated_at', { ascending: false });
+
+        if (error && error.code === 'PGRST205') {
+          const fallback = await supabase
+            .from('properties')
+            .select('data')
+            .order('updated_at', { ascending: false });
+          data = fallback.data;
+          error = fallback.error;
+        }
 
         if (!error && data && data.length > 0) {
           return data.map((row: { data: Property }) => row.data);
@@ -76,6 +101,30 @@ export class SyncService {
     return null;
   }
 
+  // Check Supabase connection & table health
+  static async checkSupabaseStatus(): Promise<{ configured: boolean; tableReady: boolean; message: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { configured: false, tableReady: false, message: 'Supabase non configuré' };
+    }
+    try {
+      const { error } = await supabase.from('property').select('id').limit(1);
+      if (!error) {
+        return { configured: true, tableReady: true, message: 'Table "property" active et synchronisée' };
+      }
+      if (error.code === 'PGRST205') {
+        // Try fallback
+        const fb = await supabase.from('properties').select('id').limit(1);
+        if (!fb.error) {
+          return { configured: true, tableReady: true, message: 'Table "properties" active et synchronisée' };
+        }
+        return { configured: true, tableReady: false, message: 'Table manquante dans Supabase' };
+      }
+      return { configured: true, tableReady: false, message: error.message };
+    } catch (err: any) {
+      return { configured: true, tableReady: false, message: err?.message || 'Erreur réseau' };
+    }
+  }
+
   // Subscribe to real-time updates (Supabase Realtime + SSE + Polling fallback)
   static subscribeToUpdates(onUpdate: (properties: Property[]) => void): () => void {
     let isSubscribed = true;
@@ -90,10 +139,21 @@ export class SyncService {
     // 1. Connect Supabase Realtime if configured
     if (isSupabaseConfigured && supabase) {
       const channel = supabase
-        .channel('public:property')
+        .channel('schema-db-changes')
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'property' },
+          async () => {
+            if (!isSubscribed) return;
+            const freshData = await this.fetchFromServer();
+            if (freshData && isSubscribed) {
+              onUpdate(freshData);
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'properties' },
           async () => {
             if (!isSubscribed) return;
             const freshData = await this.fetchFromServer();
