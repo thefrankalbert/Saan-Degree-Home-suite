@@ -40,6 +40,17 @@
         "welcomeMessage": "Bienvenue à Ouagadougou pour votre mission institutionnelle.",
         "status": "upcoming",
         "numberOfGuests": 3
+      },
+      {
+        "id": "stay-saan-003",
+        "name": "Dr. Idrissa Ouédraogo",
+        "checkInDate": "2026-10-07",
+        "checkOutDate": "2026-10-12",
+        "checkInTime": "14:00",
+        "checkOutTime": "12:00",
+        "welcomeMessage": "Excellente escale professionnelle chez Sãan Degree.",
+        "status": "upcoming",
+        "numberOfGuests": 1
       }
     ],
     "guide": [
@@ -123,6 +134,6 @@
       "emergencyDoctor": "SAMU Ouaga : 15 / Clinique Notre Dame de la Paix : +226 25 37 42 42",
       "emergencyPharmacy": "Pharmacie Ouaga 2000 : +226 25 37 45 45 / Police secours : 17"
     },
-    "updatedAt": "2026-09-23T12:00:00.000Z"
+    "updatedAt": "2026-09-26T12:00:00.000Z"
   }
 ]

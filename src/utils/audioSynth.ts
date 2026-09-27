@@ -7,27 +7,39 @@ class AmbientSoundManager {
   private zenTimer?: number;
 
   private initContext() {
-    if (!this.ctx) {
-      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.ctx = new AudioContextClass();
-    }
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
+    try {
+      if (!this.ctx) {
+        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (AudioContextClass) {
+          this.ctx = new AudioContextClass();
+        }
+      }
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Web Audio not supported on this TV browser:', e);
     }
   }
 
   public setMode(mode: 'fireplace' | 'zen' | 'off') {
-    this.stop();
-    this.currentMode = mode;
-    if (mode === 'off') return;
+    try {
+      this.stop();
+      this.currentMode = mode;
+      if (mode === 'off') return;
 
-    this.initContext();
-    if (mode === 'fireplace') {
-      this.startFireplace();
-    } else if (mode === 'zen') {
-      this.startZen();
+      this.initContext();
+      if (!this.ctx) return;
+
+      if (mode === 'fireplace') {
+        this.startFireplace();
+      } else if (mode === 'zen') {
+        this.startZen();
+      }
+      this.isPlaying = true;
+    } catch (e) {
+      console.warn('Failed to switch audio mode:', e);
     }
-    this.isPlaying = true;
   }
 
   public getMode(): 'fireplace' | 'zen' | 'off' {
@@ -38,99 +50,111 @@ class AmbientSoundManager {
     if (!this.ctx) return;
     const ctx = this.ctx;
 
-    // Pink/Brown noise generator for gentle fire rumble
-    const bufferSize = ctx.sampleRate * 2;
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    let b0 = 0, b1 = 0, b2 = 0;
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1;
-      b0 = 0.99886 * b0 + white * 0.0555179;
-      b1 = 0.99332 * b1 + white * 0.0750759;
-      b2 = 0.96900 * b2 + white * 0.1538520;
-      output[i] = (b0 + b1 + b2) * 0.12;
-    }
-
-    const whiteNoise = ctx.createBufferSource();
-    whiteNoise.buffer = noiseBuffer;
-    whiteNoise.loop = true;
-
-    // Filter to warm wood combustion low frequencies
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(450, ctx.currentTime);
-
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.08, ctx.currentTime);
-
-    whiteNoise.connect(filter);
-    filter.connect(masterGain);
-    masterGain.connect(ctx.destination);
-    whiteNoise.start();
-
-    // Occasional tiny crackle clicks
-    const crackleInterval = window.setInterval(() => {
-      if (!this.ctx || this.currentMode !== 'fireplace') return;
-      if (Math.random() > 0.4) {
-        const osc = this.ctx.createOscillator();
-        const crackleGain = this.ctx.createGain();
-        const now = this.ctx.currentTime;
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(250 + Math.random() * 800, now);
-        crackleGain.gain.setValueAtTime(0.04 * (Math.random() + 0.5), now);
-        crackleGain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
-        osc.connect(crackleGain);
-        crackleGain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.04);
+    try {
+      // Pink/Brown noise generator for gentle fire rumble
+      const bufferSize = ctx.sampleRate * 2;
+      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      let b0 = 0, b1 = 0, b2 = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + white * 0.0555179;
+        b1 = 0.99332 * b1 + white * 0.0750759;
+        b2 = 0.96900 * b2 + white * 0.1538520;
+        output[i] = (b0 + b1 + b2) * 0.12;
       }
-    }, 180);
 
-    this.fireNodes = { noise: whiteNoise, gain: masterGain, timer: crackleInterval };
+      const whiteNoise = ctx.createBufferSource();
+      whiteNoise.buffer = noiseBuffer;
+      whiteNoise.loop = true;
+
+      // Filter to warm wood combustion low frequencies
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 380;
+
+      const gain = ctx.createGain();
+      gain.gain.value = 0.07;
+
+      whiteNoise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      whiteNoise.start();
+
+      this.fireNodes.noise = whiteNoise;
+      this.fireNodes.gain = gain;
+
+      // Crackling embers simulation
+      const crackle = () => {
+        if (!this.isPlaying || this.currentMode !== 'fireplace' || !this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const crackleGain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(1200 + Math.random() * 1800, this.ctx.currentTime);
+          crackleGain.gain.setValueAtTime(0.04 + Math.random() * 0.04, this.ctx.currentTime);
+          crackleGain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+          osc.connect(crackleGain);
+          crackleGain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.05);
+        } catch {
+          // Ignored
+        }
+
+        const nextTime = Math.random() * 800 + 200;
+        this.fireNodes.timer = window.setTimeout(crackle, nextTime);
+      };
+
+      crackle();
+    } catch (e) {
+      console.warn('Fireplace sound error:', e);
+    }
   }
 
   private startZen() {
     if (!this.ctx) return;
-    const playChime = () => {
-      if (!this.ctx || this.currentMode !== 'zen') return;
-      const notes = [261.63, 329.63, 392.00, 523.25, 659.25]; // C, E, G, C5, E5
-      const note = notes[Math.floor(Math.random() * notes.length)];
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      const now = this.ctx.currentTime;
+    const ctx = this.ctx;
 
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(note, now);
-      gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(0.04, now + 1.2);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 4.5);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(now);
-      osc.stop(now + 4.6);
-    };
-
-    playChime();
-    this.zenTimer = window.setInterval(playChime, 6000);
+    try {
+      // Warm chord drone
+      const chords = [220, 277.18, 329.63, 440]; // A major 7th gentle hotel chord
+      chords.forEach(freq => {
+        try {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.value = 0.015;
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+        } catch {
+          // Ignored
+        }
+      });
+    } catch (e) {
+      console.warn('Zen sound error:', e);
+    }
   }
 
   public stop() {
+    this.isPlaying = false;
     if (this.fireNodes.timer) {
-      clearInterval(this.fireNodes.timer);
-    }
-    if (this.fireNodes.noise && 'stop' in this.fireNodes.noise) {
-      try {
-        (this.fireNodes.noise as AudioScheduledSourceNode).stop();
-      } catch {
-        // Ignored
-      }
+      clearTimeout(this.fireNodes.timer);
     }
     if (this.zenTimer) {
-      clearInterval(this.zenTimer);
+      clearTimeout(this.zenTimer);
     }
-    this.isPlaying = false;
-    this.currentMode = 'off';
+    try {
+      if (this.ctx && this.ctx.state !== 'closed') {
+        this.ctx.close().catch(() => {});
+        this.ctx = null;
+      }
+    } catch {
+      // Ignored
+    }
+    this.fireNodes = {};
   }
 }
 

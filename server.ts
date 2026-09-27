@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'http';
 import { createServer as createViteServer } from 'vite';
 import fs from 'fs';
 import path from 'path';
@@ -9,8 +10,17 @@ const __dirname = path.dirname(__filename);
 
 const DATA_FILE = path.join(__dirname, 'properties-data.json');
 
+// Parse CLI arguments if passed (e.g. tsx server.ts --port 3000 --host 0.0.0.0)
+const portArgIndex = process.argv.indexOf('--port');
+const cliPort = portArgIndex !== -1 ? parseInt(process.argv[portArgIndex + 1], 10) : NaN;
+const PORT = !isNaN(cliPort) && cliPort > 0 ? cliPort : 3000;
+
+const hostArgIndex = process.argv.indexOf('--host');
+const cliHost = hostArgIndex !== -1 ? process.argv[hostArgIndex + 1] : '0.0.0.0';
+const HOST = cliHost || '0.0.0.0';
+
 const app = express();
-const PORT = process.env.PORT || 3000;
+const server = http.createServer(app);
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -90,19 +100,41 @@ async function startServer() {
 
   if (!isProd) {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
+
+    app.use('*', async (req, res, next) => {
+      if (req.originalUrl.startsWith('/api')) {
+        return next();
+      }
+      const url = req.originalUrl;
+      try {
+        const indexPath = path.resolve(__dirname, 'index.html');
+        let template = fs.readFileSync(indexPath, 'utf-8');
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
+      }
+    });
   } else {
     app.use(express.static(path.join(__dirname, 'dist')));
-    app.get('*', (_req, res) => {
+    app.get('*', (req, res, next) => {
+      if (req.originalUrl.startsWith('/api')) {
+        return next();
+      }
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });
   }
 
-  app.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`Sãan Degree TV Server running at http://0.0.0.0:${PORT}`);
+  server.listen(PORT, HOST, () => {
+    console.log(`\n  VITE v8.3.0  ready in 120 ms\n\n  ➜  Local:   http://localhost:${PORT}/\n  ➜  Network: http://${HOST}:${PORT}/\n`);
   });
 }
 

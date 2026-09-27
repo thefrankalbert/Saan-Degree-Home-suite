@@ -219,31 +219,35 @@ export const TVSetupGuideModal: React.FC<TVSetupGuideModalProps> = ({ property, 
           {activeTvType === 'android' && (
             <div className="space-y-4">
               <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.08] text-slate-200 text-xs">
-                💡 <span className="font-medium text-[#c5b392]">Le meilleur confort hôtelier :</span> L'application gratuite <span className="font-medium text-white">Fully Kiosk Browser</span> ou <span className="font-medium text-white">TV Bro</span> disponible sur le Play Store de votre Android TV.
+                💡 <span className="font-medium text-[#c5b392]">Configuration idéale pour Sharp Google TV 55" :</span> L'application <span className="font-medium text-white">Fully Kiosk Browser</span> offre le rendu hôtelier le plus propre et fluide.
               </div>
 
               <div className="space-y-3 pt-2">
                 <div className="flex gap-3.5 items-start">
                   <div className="w-6 h-6 rounded-full bg-white/[0.04] border border-white/10 text-[#c5b392] flex items-center justify-center font-serif text-xs shrink-0">1</div>
                   <div>
-                    <div className="font-medium text-white">Installer Fully Kiosk Browser</div>
-                    <div className="text-slate-400 mt-0.5">Sur le Google Play Store de votre téléviseur, cherchez et installez « Fully Kiosk Browser ».</div>
+                    <div className="font-medium text-white">Installer Fully Kiosk Browser sur la Sharp TV</div>
+                    <div className="text-slate-400 mt-0.5">Sur le Google Play Store de votre Sharp Google TV, installez « Fully Kiosk Browser ».</div>
                   </div>
                 </div>
 
                 <div className="flex gap-3.5 items-start">
                   <div className="w-6 h-6 rounded-full bg-white/[0.04] border border-white/10 text-[#c5b392] flex items-center justify-center font-serif text-xs shrink-0">2</div>
                   <div>
-                    <div className="font-medium text-white">Définir l'URL de démarrage</div>
-                    <div className="text-slate-400 mt-0.5">Saisissez le lien court généré ci-dessus dans les paramètres de Fully Kiosk.</div>
+                    <div className="font-medium text-white">Paramètres recommandés dans Fully Kiosk</div>
+                    <div className="text-slate-400 mt-0.5 space-y-1">
+                      <div>• <strong>Start URL</strong> : Copiez l'URL de votre kiosque générée ci-dessus.</div>
+                      <div>• <strong>Web Zoom</strong> : Si besoin, utilisez les boutons <strong>[ - ]</strong> et <strong>[ + ]</strong> intégrés en haut de l'écran pour ajuster la taille exacte de votre 55".</div>
+                      <div>• <strong>Fullscreen Mode</strong> : Activez « Enable Fullscreen » pour masquer les barres d'adresse d'Android.</div>
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex gap-3.5 items-start">
                   <div className="w-6 h-6 rounded-full bg-white/[0.04] border border-white/10 text-[#c5b392] flex items-center justify-center font-serif text-xs shrink-0">3</div>
                   <div>
-                    <div className="font-medium text-white">Démarrage automatique à l'allumage</div>
-                    <div className="text-slate-400 mt-0.5">Cochez « Start on Boot ». Dès que la TV s'allume, l'accueil Sãan Degree s'affiche instantanément en plein écran sans aucune manipulation.</div>
+                    <div className="font-medium text-white">Contrôle à la télécommande Sharp</div>
+                    <div className="text-slate-400 mt-0.5">La croix multidirectionnelle (◀ ▶ pour les onglets, ▲ ▼ pour le menu supérieur) et la touche centrale <strong>OK</strong> sont reconnues nativement dans Fully Kiosk.</div>
                   </div>
                 </div>
               </div>

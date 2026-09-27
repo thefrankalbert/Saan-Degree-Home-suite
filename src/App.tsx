@@ -14,18 +14,19 @@ import { GoogleSheetSyncModal } from './components/GoogleSheetSyncModal';
 import { TVTesterModal } from './components/TVTesterModal';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { SyncService } from './utils/syncService';
+import { sanitizeProperties } from './utils/propertySanitizer';
 
 const STORAGE_KEY = 'saan_degree_genesis_v3';
 
 export default function App() {
-  // Load saved properties or default
+  // Load saved properties or default (strictly sanitized)
   const [properties, setProperties] = useState<Property[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.some(p => p.id.includes('saan'))) {
-          return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return sanitizeProperties(parsed);
         }
       }
     } catch {
@@ -97,15 +98,16 @@ export default function App() {
 
   // Persist properties locally, on backend server, and broadcast to all TVs
   const updateProperties = (newProperties: Property[]) => {
-    setProperties(newProperties);
+    const sanitized = sanitizeProperties(newProperties);
+    setProperties(sanitized);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newProperties));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
       // Broadcast via WebSocket/SSE to all connected Smart TVs worldwide
-      SyncService.saveToServer(newProperties);
+      SyncService.saveToServer(sanitized);
       // Notify other tabs/screens locally
       if (window.BroadcastChannel) {
         const bc = new BroadcastChannel('lodgecast_sync_channel');
-        bc.postMessage({ type: 'UPDATE_PROPERTIES', payload: newProperties });
+        bc.postMessage({ type: 'UPDATE_PROPERTIES', payload: sanitized });
         bc.close();
       }
     } catch (err) {
@@ -118,9 +120,10 @@ export default function App() {
     // 1. Subscribe to server push (SSE + polling fallback)
     const unsubscribe = SyncService.subscribeToUpdates((serverProperties) => {
       if (Array.isArray(serverProperties) && serverProperties.length > 0) {
-        setProperties(serverProperties);
+        const sanitized = sanitizeProperties(serverProperties);
+        setProperties(sanitized);
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(serverProperties));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
         } catch {
           // Ignored
         }
@@ -133,7 +136,7 @@ export default function App() {
       bc = new BroadcastChannel('lodgecast_sync_channel');
       bc.onmessage = (event) => {
         if (event.data?.type === 'UPDATE_PROPERTIES' && Array.isArray(event.data.payload)) {
-          setProperties(event.data.payload);
+          setProperties(sanitizeProperties(event.data.payload));
         }
       };
     }

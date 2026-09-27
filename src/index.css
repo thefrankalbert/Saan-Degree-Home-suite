@@ -6,34 +6,46 @@
     --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
-  body {
-    font-family: var(--font-sans);
-    background-color: #090a0f;
-    color: #e2e8f0;
+  html, body, #root {
+    height: 100%;
+    max-height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    overflow-x: hidden;
+    background-color: #06070a;
+    color: #e2e8f0;
+    font-family: var(--font-sans);
   }
 
   h1, h2, .font-serif-luxury {
     font-family: var(--font-serif);
   }
+
+  /* Universal TV focus indicator for Smart TV remote control D-Pad */
+  :focus-visible {
+    outline: 2px solid #c5b392 !important;
+    outline-offset: 3px !important;
+    box-shadow: 0 0 16px rgba(197, 179, 146, 0.45) !important;
+  }
 }
 
 /* Luxury TV glass & reflections */
 .luxury-glass {
-  background: rgba(15, 17, 26, 0.65);
+  background: rgba(15, 17, 26, 0.72);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.09);
 }
 
 .luxury-glass-active {
-  background: rgba(26, 30, 46, 0.85);
+  background: rgba(26, 30, 46, 0.88);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
-  border: 1px solid rgba(212, 175, 55, 0.35);
-  box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.7), 0 0 24px -4px rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.7), 0 0 24px -4px rgba(212, 175, 55, 0.2);
 }
 
 .champagne-gradient {
@@ -46,6 +58,19 @@
   background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+/* TV Focus Halo */
+.tv-focusable {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.tv-focusable:focus,
+.tv-focusable:focus-within,
+.tv-focusable.tv-focused {
+  transform: scale(1.03);
+  border-color: rgba(197, 179, 146, 0.8) !important;
+  box-shadow: 0 0 0 2px rgba(197, 179, 146, 0.6), 0 8px 24px rgba(0, 0, 0, 0.6) !important;
 }
 
 /* Subtle TV screen burn-in protection drift */

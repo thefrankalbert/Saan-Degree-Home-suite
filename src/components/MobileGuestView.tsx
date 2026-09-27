@@ -241,7 +241,7 @@ export const MobileGuestView: React.FC<MobileGuestViewProps> = ({ property, onOp
         {activeTab === 'guide' && (
           <div className="space-y-3">
             <div className="text-xs text-slate-400 font-light mb-2">{t.houseGuideSubtitle} :</div>
-            {property.guide.map((item) => {
+            {(property.guide || []).map((item) => {
               const isExpanded = expandedGuideId === item.id;
               return (
                 <div 
@@ -285,7 +285,7 @@ export const MobileGuestView: React.FC<MobileGuestViewProps> = ({ property, onOp
         {activeTab === 'places' && (
           <div className="space-y-3">
             <div className="text-xs text-slate-400 font-light mb-2">{t.recommendationsSubtitle} :</div>
-            {property.recommendations.map((spot) => (
+            {(property.recommendations || []).map((spot) => (
               <div 
                 key={spot.id}
                 className="p-4 rounded-2xl bg-[#0c0e14] border border-white/[0.08] space-y-2"

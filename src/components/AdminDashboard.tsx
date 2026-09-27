@@ -135,7 +135,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleActivateUpcomingStay = (stay: GuestStay) => {
-    const updatedUpcoming = selectedProperty.upcomingStays.filter(s => s.id !== stay.id);
+    const currentUpcoming = selectedProperty.upcomingStays || [];
+    const updatedUpcoming = currentUpcoming.filter(s => s.id !== stay.id);
     const updatedProp: Property = {
       ...selectedProperty,
       currentStay: { ...stay, status: 'active' },
@@ -563,17 +564,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-medium text-white font-serif tracking-wide">Prochaines Arrivées</h3>
                   <span className="text-xs text-slate-400 font-mono">
-                    {selectedProperty.upcomingStays.length} réservations
+                    {(selectedProperty.upcomingStays || []).length} réservations
                   </span>
                 </div>
 
-                {selectedProperty.upcomingStays.length === 0 ? (
+                {!(selectedProperty.upcomingStays && selectedProperty.upcomingStays.length > 0) ? (
                   <div className="p-6 rounded-2xl bg-[#08090d] border border-white/[0.04] text-center text-xs text-slate-500 font-light">
                     Aucune réservation suivante en attente.
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {selectedProperty.upcomingStays.map((stay) => (
+                    {(selectedProperty.upcomingStays || []).map((stay) => (
                       <div 
                         key={stay.id}
                         className="p-4 rounded-2xl bg-[#08090d] border border-white/[0.06] space-y-2 hover:border-[#c5b392]/30 transition"
@@ -672,7 +673,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {selectedProperty.guide.map((item) => (
+              {(selectedProperty.guide || []).map((item) => (
                 <div key={item.id} className="p-5 rounded-2xl bg-[#0c0e14] border border-white/[0.08] space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-medium text-white font-serif">{item.title}</div>
@@ -697,7 +698,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {selectedProperty.recommendations.map((spot) => (
+              {(selectedProperty.recommendations || []).map((spot) => (
                 <div key={spot.id} className="p-5 rounded-2xl bg-[#0c0e14] border border-white/[0.08] space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] uppercase tracking-widest font-medium text-[#c5b392]">
