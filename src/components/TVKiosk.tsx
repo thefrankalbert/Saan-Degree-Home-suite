@@ -174,14 +174,6 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
         document.head.appendChild(metaViewport);
       }
       metaViewport.setAttribute('content', 'width=1920, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-      
-      // Proportional UI scaling using rem base (16px -> 32px = 2.0x zoom)
-      // This natively scales all Tailwind margins, text, widths, and heights for a 1080p TV.
-      document.documentElement.style.fontSize = '32px';
-      
-      return () => {
-        document.documentElement.style.fontSize = '';
-      };
     }
   }, [isTV]);
 
