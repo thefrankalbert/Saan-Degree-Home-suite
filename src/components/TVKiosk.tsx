@@ -19,7 +19,11 @@ import {
   Star,
   Sparkles,
   BookOpen,
-  Compass
+  Compass,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Pause
 } from 'lucide-react';
 import { Property, TVTab } from '../types';
 import { generateWifiQrCode, generateUrlQrCode } from '../utils/qrHelper';
@@ -56,42 +60,11 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
   const [soundMode, setSoundMode] = useState<'off' | 'fireplace' | 'zen'>('off');
   const [isDimmerMode, setIsDimmerMode] = useState<boolean>(false);
   const [lastRemoteAction, setLastRemoteAction] = useState<string>('');
+  const [lastRawKey, setLastRawKey] = useState<string>('');
+  const [isCarouselActive, setIsCarouselActive] = useState<boolean>(false);
 
   const tvContainerRef = useRef<HTMLDivElement>(null);
-
-  // Auto-focus the TV app on load so that Android WebView forwards remote control keys
-  useEffect(() => {
-    const focusRoot = () => {
-      if (tvContainerRef.current) {
-        tvContainerRef.current.focus();
-      }
-      try {
-        window.focus();
-      } catch {
-        // Ignored
-      }
-    };
-
-    focusRoot();
-    const interval = setInterval(focusRoot, 1500);
-
-    const onUserTouchOrClick = () => focusRoot();
-    window.addEventListener('click', onUserTouchOrClick);
-    window.addEventListener('touchstart', onUserTouchOrClick);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('click', onUserTouchOrClick);
-      window.removeEventListener('touchstart', onUserTouchOrClick);
-    };
-  }, []);
-
-  // Clear feedback HUD
-  useEffect(() => {
-    if (!lastRemoteAction) return;
-    const timer = setTimeout(() => setLastRemoteAction(''), 2500);
-    return () => clearTimeout(timer);
-  }, [lastRemoteAction]);
+  const lastKeyTimestamp = useRef<number>(0);
 
   const t = DICTIONARY[lang];
   const weather = getEstimatedWeather(property.weatherCity || property.city || 'Ouagadougou');
@@ -107,6 +80,59 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
     { id: 'places', label: t.navTabs.places, icon: <Compass className="w-4 h-4" strokeWidth={1.5} />, shortcut: '4' },
     { id: 'contacts', label: t.navTabs.contacts, icon: <Phone className="w-4 h-4" strokeWidth={1.5} />, shortcut: '5' }
   ];
+
+  const goToNextTab = useCallback(() => {
+    setActiveTab((prev) => {
+      const idx = tabs.findIndex(t => t.id === prev);
+      const next = tabs[(idx + 1) % tabs.length];
+      setLastRemoteAction(`▶ ${next.label}`);
+      return next.id;
+    });
+  }, [tabs]);
+
+  const goToPrevTab = useCallback(() => {
+    setActiveTab((prev) => {
+      const idx = tabs.findIndex(t => t.id === prev);
+      const prevTab = tabs[(idx - 1 + tabs.length) % tabs.length];
+      setLastRemoteAction(`◀ ${prevTab.label}`);
+      return prevTab.id;
+    });
+  }, [tabs]);
+
+  // Keep DOM focus locked on active tab button for Android Spatial Navigation
+  useEffect(() => {
+    const focusTabElement = () => {
+      const el = document.getElementById(`tv-tab-${activeTab}`);
+      if (el) {
+        el.focus();
+      } else if (tvContainerRef.current) {
+        tvContainerRef.current.focus();
+      }
+    };
+
+    focusTabElement();
+    const timer = setTimeout(focusTabElement, 150);
+    return () => clearTimeout(timer);
+  }, [activeTab]);
+
+  // Automatic Carousel mode (every 18s)
+  useEffect(() => {
+    if (!isCarouselActive) return;
+    const interval = setInterval(() => {
+      goToNextTab();
+    }, 18000);
+    return () => clearInterval(interval);
+  }, [isCarouselActive, goToNextTab]);
+
+  // Clear feedback HUD
+  useEffect(() => {
+    if (!lastRemoteAction && !lastRawKey) return;
+    const timer = setTimeout(() => {
+      setLastRemoteAction('');
+      setLastRawKey('');
+    }, 3200);
+    return () => clearTimeout(timer);
+  }, [lastRemoteAction, lastRawKey]);
 
   // Detect TV mode dynamically to force viewport scale
   useEffect(() => {
@@ -151,6 +177,15 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
 
     const code = e.keyCode || e.which;
     const key = e.key;
+
+    const now = Date.now();
+    // Prevent double firing from keydown + keyup within 180ms
+    if (now - lastKeyTimestamp.current < 180) {
+      return;
+    }
+    lastKeyTimestamp.current = now;
+
+    setLastRawKey(`Touche: ${key || 'Key'} (Code: ${code})`);
 
     // 1. Next tab: D-Pad Right, D-Pad Down, Channel Up, ArrowRight, ArrowDown
     if (
@@ -253,9 +288,13 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
     // Use capture phase to intercept before Android WebView swallows keys
     window.addEventListener('keydown', onKey, true);
     document.addEventListener('keydown', onKey, true);
+    window.addEventListener('keyup', onKey, true);
+    document.addEventListener('keyup', onKey, true);
     return () => {
       window.removeEventListener('keydown', onKey, true);
       document.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('keyup', onKey, true);
+      document.removeEventListener('keyup', onKey, true);
     };
   }, [handleKeyDown]);
 
@@ -421,6 +460,26 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
                   </button>
                 ))}
               </div>
+
+              {/* Diaporama / Auto-cycle Button */}
+              <button
+                id="tv-btn-carousel"
+                tabIndex={0}
+                onClick={() => {
+                  const nextState = !isCarouselActive;
+                  setIsCarouselActive(nextState);
+                  setLastRemoteAction(nextState ? 'Diaporama activé (18s)' : 'Diaporama désactivé');
+                }}
+                className={`p-2 rounded-xl transition border text-xs flex items-center gap-1.5 cursor-pointer focus:ring-2 focus:ring-[#c5b392] focus:scale-105 ${
+                  isCarouselActive
+                    ? 'bg-[#c5b392] text-[#07080b] font-semibold border-[#c5b392] shadow-md'
+                    : 'bg-white/[0.03] text-slate-400 border-white/[0.08] hover:bg-white/[0.06] hover:text-white'
+                }`}
+                title={isCarouselActive ? "Désactiver le défilement automatique" : "Activer le défilement automatique (18s)"}
+              >
+                {isCarouselActive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                <span className="text-[10px] hidden md:inline">{isCarouselActive ? 'Diaporama Actif' : 'Diaporama'}</span>
+              </button>
 
               {/* Ambient Sound */}
               <button
@@ -793,15 +852,41 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
         {/* BOTTOM NAVIGATION: Strict Luxury TV Dock */}
         <footer className="shrink-0 border-t border-white/[0.08] pt-3 flex items-center justify-between">
           
-          {/* Navigation Tabs */}
+          {/* Navigation Tabs with Spatial Navigation & Chevrons */}
           <nav className="flex items-center gap-2 p-1.5 rounded-2xl bg-white/[0.04] border border-white/[0.1] backdrop-blur-xl">
+            {/* Prev Chevron */}
+            <button
+              id="tv-btn-prev"
+              tabIndex={0}
+              onClick={goToPrevTab}
+              className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] border border-white/[0.08] text-[#c5b392] focus:ring-4 focus:ring-[#c5b392] focus:scale-110 focus:outline-none transition cursor-pointer"
+              title="Onglet précédent (Flèche Gauche)"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition-all duration-150 ${
+                  id={`tv-tab-${tab.id}`}
+                  tabIndex={0}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setLastRemoteAction(tab.label);
+                  }}
+                  onFocus={() => {
+                    setActiveTab(tab.id);
+                    setLastRemoteAction(tab.label);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.keyCode === 13 || e.keyCode === 23 || e.keyCode === 66) {
+                      setActiveTab(tab.id);
+                      setLastRemoteAction(tab.label);
+                    }
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition-all duration-150 cursor-pointer focus:outline-none focus:ring-4 focus:ring-[#c5b392] focus:scale-110 ${
                     isActive 
                       ? 'bg-[#c5b392] text-[#07080b] font-bold shadow-[0_0_25px_rgba(197,179,146,0.6)] scale-105 ring-2 ring-white/60' 
                       : 'text-slate-300 hover:text-white hover:bg-white/[0.06] font-medium'
@@ -815,11 +900,27 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
                 </button>
               );
             })}
+
+            {/* Next Chevron */}
+            <button
+              id="tv-btn-next"
+              tabIndex={0}
+              onClick={goToNextTab}
+              className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] border border-white/[0.08] text-[#c5b392] focus:ring-4 focus:ring-[#c5b392] focus:scale-110 focus:outline-none transition cursor-pointer"
+              title="Onglet suivant (Flèche Droite)"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </nav>
 
-          {/* Remote Navigation Hint with Dynamic HUD Feedback */}
-          <div className="flex items-center gap-2 text-xs text-slate-300 font-light bg-white/[0.04] px-4 py-2 rounded-2xl border border-white/[0.1] shadow-lg">
-            {lastRemoteAction ? (
+          {/* Remote Navigation Hint with Dynamic Signal HUD Feedback */}
+          <div className="flex items-center gap-2.5 text-xs text-slate-300 font-light bg-white/[0.04] px-4 py-2 rounded-2xl border border-white/[0.1] shadow-lg">
+            {lastRawKey ? (
+              <span className="text-[#c5b392] font-semibold flex items-center gap-2 font-mono text-[11px] animate-pulse">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                <span>Signal : {lastRawKey} {lastRemoteAction ? `→ ${lastRemoteAction}` : ''}</span>
+              </span>
+            ) : lastRemoteAction ? (
               <span className="text-[#c5b392] font-semibold flex items-center gap-2 animate-pulse">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#c5b392] shadow-[0_0_8px_#c5b392]" />
                 <span>Télécommande : {lastRemoteAction}</span>
@@ -827,7 +928,7 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
             ) : (
               <>
                 <span className="text-[#c5b392] font-semibold">Télécommande :</span>
-                <span className="text-white font-medium">Flèches ◀ ▶ (ou ▲ ▼) · OK · Touches [1 à 5]</span>
+                <span className="text-white font-medium">Flèches ◀ ▶ · OK · Touches [1 à 5]</span>
               </>
             )}
           </div>
