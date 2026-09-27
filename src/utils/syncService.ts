@@ -54,15 +54,24 @@ export class SyncService {
       }
 
       // 2. Fallback to server API
-      const res = await fetch('/api/properties');
+      const res = await fetch('/api/properties', {
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
       if (res.ok) {
-        const result = await res.json();
-        if (result && Array.isArray(result.properties) && result.properties.length > 0) {
-          return result.properties;
+        const contentType = res.headers.get('content-type') || '';
+        // Guard against HTML responses (e.g. reverse proxy warm-up or SPA fallback)
+        if (contentType.includes('application/json')) {
+          const result = await res.json();
+          if (result && Array.isArray(result.properties) && result.properties.length > 0) {
+            return result.properties;
+          }
         }
       }
-    } catch (err) {
-      console.error('Failed to fetch from server:', err);
+    } catch {
+      // Server warming up or offline; fallback cleanly to local storage & defaults
     }
     return null;
   }

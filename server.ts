@@ -58,12 +58,13 @@ function savePropertiesData(data: unknown) {
 }
 
 // REST API routes
-app.get('/api/properties', (_req, res) => {
+app.get(['/api/properties', '/api/properties/'], (_req, res) => {
   const data = getPropertiesData();
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.json({ properties: data });
 });
 
-app.post('/api/properties', (req, res) => {
+app.post(['/api/properties', '/api/properties/'], (req, res) => {
   const { properties } = req.body;
   if (!properties || !Array.isArray(properties)) {
     return res.status(400).json({ error: 'Invalid properties array' });
@@ -132,6 +133,11 @@ async function startServer() {
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });
   }
+
+  // Explicit JSON 404 for any unmatched /api route
+  app.all('/api/*', (_req, res) => {
+    res.status(404).json({ error: 'Endpoint not found' });
+  });
 
   server.listen(PORT, HOST, () => {
     console.log(`\n  VITE v8.3.0  ready in 120 ms\n\n  ➜  Local:   http://localhost:${PORT}/\n  ➜  Network: http://${HOST}:${PORT}/\n`);
