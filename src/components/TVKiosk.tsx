@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Wifi, 
   Clock, 
@@ -33,6 +33,19 @@ interface TVKioskProps {
   isStandalone?: boolean;
 }
 
+// Universal Remote KeyCodes for Sharp Google TV, Android TV, Screenlite & Fully Kiosk
+const TV_KEYS = {
+  NEXT: [22, 39, 20, 40, 166, 34], // 22: DPAD_RIGHT, 39: ArrowRight, 20: DPAD_DOWN, 40: ArrowDown, 166: Channel Up, 34: PageDown
+  PREV: [21, 37, 19, 38, 167, 33], // 21: DPAD_LEFT, 37: ArrowLeft, 19: DPAD_UP, 38: ArrowUp, 167: Channel Down, 33: PageUp
+  OK: [13, 23, 66, 65385],         // 13: Enter, 23: DPAD_CENTER, 66: Android Keycode Enter, 65385: Smart TV Select
+  BACK: [4, 27],                   // 4: Android Back, 27: Escape
+  KEY_1: [8, 49, 97],              // 8: Android 1, 49: '1', 97: Numpad 1
+  KEY_2: [9, 50, 98],              // 9: Android 2, 50: '2', 98: Numpad 2
+  KEY_3: [10, 51, 99],             // 10: Android 3, 51: '3', 99: Numpad 3
+  KEY_4: [11, 52, 100],            // 11: Android 4, 52: '4', 100: Numpad 4
+  KEY_5: [12, 53, 101],            // 12: Android 5, 53: '5', 101: Numpad 5
+};
+
 export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
   const [lang, setLang] = useState<AppLanguage>('fr');
   const [activeTab, setActiveTab] = useState<TVTab>('welcome');
@@ -42,6 +55,43 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
   const [companionQrUrl, setCompanionQrUrl] = useState<string>('');
   const [soundMode, setSoundMode] = useState<'off' | 'fireplace' | 'zen'>('off');
   const [isDimmerMode, setIsDimmerMode] = useState<boolean>(false);
+  const [lastRemoteAction, setLastRemoteAction] = useState<string>('');
+
+  const tvContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-focus the TV app on load so that Android WebView forwards remote control keys
+  useEffect(() => {
+    const focusRoot = () => {
+      if (tvContainerRef.current) {
+        tvContainerRef.current.focus();
+      }
+      try {
+        window.focus();
+      } catch {
+        // Ignored
+      }
+    };
+
+    focusRoot();
+    const interval = setInterval(focusRoot, 1500);
+
+    const onUserTouchOrClick = () => focusRoot();
+    window.addEventListener('click', onUserTouchOrClick);
+    window.addEventListener('touchstart', onUserTouchOrClick);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('click', onUserTouchOrClick);
+      window.removeEventListener('touchstart', onUserTouchOrClick);
+    };
+  }, []);
+
+  // Clear feedback HUD
+  useEffect(() => {
+    if (!lastRemoteAction) return;
+    const timer = setTimeout(() => setLastRemoteAction(''), 2500);
+    return () => clearTimeout(timer);
+  }, [lastRemoteAction]);
 
   const t = DICTIONARY[lang];
   const weather = getEstimatedWeather(property.weatherCity || property.city || 'Ouagadougou');
@@ -89,42 +139,124 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
     generateUrlQrCode(mobileUrl).then(setCompanionQrUrl);
   }, [property]);
 
-  // Handle remote control navigation
+  // Comprehensive Key Listener for Sharp Google TV + Android WebView + Screenlite Kiosk
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Wake up screen on any button press
     if (isDimmerMode) {
       setIsDimmerMode(false);
+      e.preventDefault();
+      e.stopPropagation();
       return;
     }
 
-    if (e.key === 'ArrowRight') {
+    const code = e.keyCode || e.which;
+    const key = e.key;
+
+    // 1. Next tab: D-Pad Right, D-Pad Down, Channel Up, ArrowRight, ArrowDown
+    if (
+      TV_KEYS.NEXT.includes(code) ||
+      key === 'ArrowRight' || key === 'Right' || key === 'ArrowDown' || key === 'Down'
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
       setActiveTab((prev) => {
         const idx = tabs.findIndex(t => t.id === prev);
-        return tabs[(idx + 1) % tabs.length].id;
+        const next = tabs[(idx + 1) % tabs.length];
+        setLastRemoteAction(`▶ ${next.label}`);
+        return next.id;
       });
-    } else if (e.key === 'ArrowLeft') {
-      setActiveTab((prev) => {
-        const idx = tabs.findIndex(t => t.id === prev);
-        return tabs[(idx - 1 + tabs.length) % tabs.length].id;
-      });
-    } else if (e.key === '1') {
-      setActiveTab('welcome');
-    } else if (e.key === '2') {
-      setActiveTab('wifi');
-    } else if (e.key === '3') {
-      setActiveTab('guide');
-    } else if (e.key === '4') {
-      setActiveTab('places');
-    } else if (e.key === '5') {
-      setActiveTab('contacts');
-    } else if (e.key === 'Escape' && onExitKiosk) {
-      // Secret key for dev/admin on physical keyboard
-      onExitKiosk();
+      return;
     }
-  }, [tabs, onExitKiosk, isDimmerMode]);
+
+    // 2. Previous tab: D-Pad Left, D-Pad Up, Channel Down, ArrowLeft, ArrowUp
+    if (
+      TV_KEYS.PREV.includes(code) ||
+      key === 'ArrowLeft' || key === 'Left' || key === 'ArrowUp' || key === 'Up'
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveTab((prev) => {
+        const idx = tabs.findIndex(t => t.id === prev);
+        const prevTab = tabs[(idx - 1 + tabs.length) % tabs.length];
+        setLastRemoteAction(`◀ ${prevTab.label}`);
+        return prevTab.id;
+      });
+      return;
+    }
+
+    // 3. Direct Number keys 1 à 5
+    if (TV_KEYS.KEY_1.includes(code) || key === '1') {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveTab('welcome');
+      setLastRemoteAction('Touche 1 : Accueil');
+      return;
+    }
+    if (TV_KEYS.KEY_2.includes(code) || key === '2') {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveTab('wifi');
+      setLastRemoteAction('Touche 2 : Wi-Fi');
+      return;
+    }
+    if (TV_KEYS.KEY_3.includes(code) || key === '3') {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveTab('guide');
+      setLastRemoteAction('Touche 3 : Manuel');
+      return;
+    }
+    if (TV_KEYS.KEY_4.includes(code) || key === '4') {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveTab('places');
+      setLastRemoteAction('Touche 4 : Guide');
+      return;
+    }
+    if (TV_KEYS.KEY_5.includes(code) || key === '5') {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveTab('contacts');
+      setLastRemoteAction('Touche 5 : Conciergerie');
+      return;
+    }
+
+    // 4. Center OK / Enter button
+    if (TV_KEYS.OK.includes(code) || key === 'Enter' || key === 'Select') {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveTab((prev) => {
+        const idx = tabs.findIndex(t => t.id === prev);
+        const next = tabs[(idx + 1) % tabs.length];
+        setLastRemoteAction(`OK ▶ ${next.label}`);
+        return next.id;
+      });
+      return;
+    }
+
+    // 5. Back button
+    if (TV_KEYS.BACK.includes(code) || key === 'Escape' || key === 'Back') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (activeTab !== 'welcome') {
+        setActiveTab('welcome');
+        setLastRemoteAction('Retour : Accueil');
+      } else if (onExitKiosk) {
+        onExitKiosk();
+      }
+      return;
+    }
+  }, [activeTab, tabs, onExitKiosk, isDimmerMode]);
 
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    const onKey = (e: KeyboardEvent) => handleKeyDown(e);
+    // Use capture phase to intercept before Android WebView swallows keys
+    window.addEventListener('keydown', onKey, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
   }, [handleKeyDown]);
 
   const toggleSound = () => {
@@ -202,7 +334,11 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
   }
 
   return (
-    <div className="fixed inset-0 h-screen w-screen max-h-screen max-w-screen overflow-hidden bg-[#07080b] text-slate-100 font-sans select-none flex items-center justify-center">
+    <div 
+      ref={tvContainerRef}
+      tabIndex={0}
+      className="fixed inset-0 h-screen w-screen max-h-screen max-w-screen overflow-hidden bg-[#07080b] text-slate-100 font-sans select-none flex items-center justify-center outline-none focus:outline-none"
+    >
       
       {/* Cinematic Luxury Wallpaper */}
       <div 
@@ -658,22 +794,22 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
         <footer className="shrink-0 border-t border-white/[0.08] pt-3 flex items-center justify-between">
           
           {/* Navigation Tabs */}
-          <nav className="flex items-center gap-2 p-1 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl">
+          <nav className="flex items-center gap-2 p-1.5 rounded-2xl bg-white/[0.04] border border-white/[0.1] backdrop-blur-xl">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition-all duration-150 ${
                     isActive 
-                      ? 'bg-white/[0.1] text-white border border-[#c5b392]/40 shadow-lg shadow-black/40 font-semibold' 
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                      ? 'bg-[#c5b392] text-[#07080b] font-bold shadow-[0_0_25px_rgba(197,179,146,0.6)] scale-105 ring-2 ring-white/60' 
+                      : 'text-slate-300 hover:text-white hover:bg-white/[0.06] font-medium'
                   }`}
                 >
-                  <span className={isActive ? 'text-[#c5b392]' : 'text-slate-500'}>{tab.icon}</span>
+                  <span className={isActive ? 'text-[#07080b]' : 'text-slate-400'}>{tab.icon}</span>
                   <span className="tracking-wide">{tab.label}</span>
-                  <span className={`text-[9px] font-mono px-1 rounded ${isActive ? 'text-[#c5b392]' : 'text-slate-600'}`}>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isActive ? 'bg-[#07080b]/20 text-[#07080b] font-bold' : 'text-slate-400 bg-white/[0.06]'}`}>
                     [{tab.shortcut}]
                   </span>
                 </button>
@@ -681,10 +817,19 @@ export const TVKiosk: React.FC<TVKioskProps> = ({ property, onExitKiosk }) => {
             })}
           </nav>
 
-          {/* Remote Navigation Hint */}
-          <div className="flex items-center gap-2 text-[11px] text-slate-400 font-light bg-white/[0.02] px-3 py-1.5 rounded-xl border border-white/[0.06]">
-            <span className="text-[#c5b392] font-medium">Télécommande :</span>
-            <span className="text-slate-300">Flèches ◀ ▶ ou touches [1 à 5]</span>
+          {/* Remote Navigation Hint with Dynamic HUD Feedback */}
+          <div className="flex items-center gap-2 text-xs text-slate-300 font-light bg-white/[0.04] px-4 py-2 rounded-2xl border border-white/[0.1] shadow-lg">
+            {lastRemoteAction ? (
+              <span className="text-[#c5b392] font-semibold flex items-center gap-2 animate-pulse">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#c5b392] shadow-[0_0_8px_#c5b392]" />
+                <span>Télécommande : {lastRemoteAction}</span>
+              </span>
+            ) : (
+              <>
+                <span className="text-[#c5b392] font-semibold">Télécommande :</span>
+                <span className="text-white font-medium">Flèches ◀ ▶ (ou ▲ ▼) · OK · Touches [1 à 5]</span>
+              </>
+            )}
           </div>
 
         </footer>
